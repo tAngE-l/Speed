@@ -37,29 +37,32 @@ public class UIManager : MonoBehaviour
     public Button btnToggleControl; 
     public TextMeshProUGUI controlText; 
 
-    [Header("НАСТРОЙКИ (UI)")]
-    public GameObject settingsMenu;     // Сама панель настроек
-    public Button btnOpenSettings;      // Кнопка открытия
-    public Button btnCloseSettings;     // Кнопка закрытия (крестик)
+    [Header("НАСТРОЙКИ")]
+    public GameObject settingsMenu;     
+    public Button btnOpenSettings;      
+    public Button btnCloseSettings;     
     public Slider musicSlider;
     public Slider sfxSlider;
     public Slider sensitivitySlider;
     public TMP_Dropdown qualityDropdown;
     public Button btnSaveSettings;
 
-    [Header("Выбор уровней")]
+    [Header("Выбор уровней (Панель)")]
     public GameObject levelSelectMenu; 
-    public Button btnOpenLevels;       
     public Button btnCloseLevels;      
     public Button btnLevel1;           
     public Button btnLevel2;           
     public Button btnLevel3;           
-    public Button btnPlay;             
+    
+    [Header("ГЛАВНОЕ МЕНЮ")]
+    public GameObject mainMenuPanel; 
+    public Button btnPlayGame;       // Кнопка "Играть" (по сюжету)
+    public Button btnOpenLevels;     // Кнопка "Выбор уровней"
+    public Button btnMainQuit;       
 
     private NitroSystem nitroSystem;
     private CarController car;
     private bool isPaused = false;
-    private int selectedLevelIndex = 1;
 
     private class ButtonHold : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     {
@@ -77,6 +80,38 @@ public class UIManager : MonoBehaviour
 
     private void Start()
     {
+        string currentScene = SceneManager.GetActiveScene().name;
+
+        // ==========================================
+        // НАСТРОЙКА ДЛЯ ГЛАВНОГО МЕНЮ
+        // ==========================================
+        if (currentScene == "MainMenu")
+        {
+            if (levelSelectMenu != null) levelSelectMenu.SetActive(false);
+            if (settingsMenu != null) settingsMenu.SetActive(false);
+            if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
+
+            if (btnPlayGame != null) btnPlayGame.onClick.AddListener(PlayStoryMode);
+            if (btnOpenLevels != null) btnOpenLevels.onClick.AddListener(() => { if (levelSelectMenu != null) levelSelectMenu.SetActive(true); });
+            if (btnCloseLevels != null) btnCloseLevels.onClick.AddListener(() => { if (levelSelectMenu != null) levelSelectMenu.SetActive(false); });
+            
+            // Кнопки выбора уровней (переигровка)
+            if (btnLevel1 != null) btnLevel1.onClick.AddListener(() => LoadLevelDirectly("Level_1"));
+            if (btnLevel2 != null) btnLevel2.onClick.AddListener(() => LoadLevelDirectly("Level_2"));
+            if (btnLevel3 != null) btnLevel3.onClick.AddListener(() => LoadLevelDirectly("Level_3"));
+
+            if (btnOpenSettings != null) btnOpenSettings.onClick.AddListener(OpenSettings);
+            if (btnCloseSettings != null) btnCloseSettings.onClick.AddListener(CloseSettings);
+            if (btnSaveSettings != null) btnSaveSettings.onClick.AddListener(SaveSettings);
+            if (btnMainQuit != null) btnMainQuit.onClick.AddListener(QuitGame);
+            
+            LoadSettings();
+            return; // Для главного меню настройка завершена
+        }
+
+        // ==========================================
+        // НАСТРОЙКА ДЛЯ УРОВНЕЙ
+        // ==========================================
         car = FindObjectOfType<CarController>();
         if (car != null) nitroSystem = car.GetComponent<NitroSystem>();
 
@@ -86,35 +121,26 @@ public class UIManager : MonoBehaviour
         if (nitroReadyIndicator != null) nitroReadyIndicator.SetActive(false);
         if (nitroActiveIndicator != null) nitroActiveIndicator.SetActive(false);
 
-        // Кнопки
         if (btnGas != null) holdGas = btnGas.gameObject.AddComponent<ButtonHold>();
         if (btnBrake != null) holdBrake = btnBrake.gameObject.AddComponent<ButtonHold>();
         if (btnLeft != null) holdLeft = btnLeft.gameObject.AddComponent<ButtonHold>();
         if (btnRight != null) holdRight = btnRight.gameObject.AddComponent<ButtonHold>();
         if (btnNitro != null) btnNitro.onClick.AddListener(() => car?.ActivateNitro());
 
-        // Меню паузы
         if (pauseMenu != null) pauseMenu.SetActive(false);
         if (pauseButton != null) pauseButton.onClick.AddListener(TogglePause);
         if (btnResume != null) btnResume.onClick.AddListener(TogglePause);
         if (btnRestart != null) btnRestart.onClick.AddListener(RestartLevel);
-        if (btnQuit != null) btnQuit.onClick.AddListener(QuitGame);
+        
+        // Кнопка "Выход" в меню паузы ведет в главное меню
+        if (btnQuit != null) btnQuit.onClick.AddListener(GoToMainMenu);
+        
         if (btnToggleControl != null) btnToggleControl.onClick.AddListener(ToggleControlMode);
         
-        // Настройки
         if (settingsMenu != null) settingsMenu.SetActive(false);
         if (btnOpenSettings != null) btnOpenSettings.onClick.AddListener(OpenSettings);
         if (btnCloseSettings != null) btnCloseSettings.onClick.AddListener(CloseSettings);
         if (btnSaveSettings != null) btnSaveSettings.onClick.AddListener(SaveSettings);
-
-        // Выбор уровней
-        if (levelSelectMenu != null) levelSelectMenu.SetActive(false);
-        if (btnOpenLevels != null) btnOpenLevels.onClick.AddListener(OpenLevelMenu);
-        if (btnCloseLevels != null) btnCloseLevels.onClick.AddListener(() => levelSelectMenu.SetActive(false));
-        if (btnLevel1 != null) btnLevel1.onClick.AddListener(() => SelectLevel(1));
-        if (btnLevel2 != null) btnLevel2.onClick.AddListener(() => SelectLevel(2));
-        if (btnLevel3 != null) btnLevel3.onClick.AddListener(() => SelectLevel(3));
-        if (btnPlay != null) btnPlay.onClick.AddListener(PlaySelectedLevel);
 
         ApplyControlMode(); 
         LoadSettings();
@@ -132,16 +158,10 @@ public class UIManager : MonoBehaviour
             car.SetLeft(holdLeft != null && holdLeft.isPressed);
             car.SetRight(holdRight != null && holdRight.isPressed);
         }
-        else if (steeringWheel != null)
-        {
-            car.SetSteer(steeringWheel.GetSteeringValue());
-        }
+        else if (steeringWheel != null) car.SetSteer(steeringWheel.GetSteeringValue());
 
-        if (nitroSystem != null && nitroBarFill != null)
-            nitroBarFill.fillAmount = nitroSystem.GetChargeNormalized();
-            
-        if (nitroSystem != null && nitroReadyIndicator != null)
-            nitroReadyIndicator.SetActive(nitroSystem.IsFull() && !nitroSystem.IsBoosting());
+        if (nitroSystem != null && nitroBarFill != null) nitroBarFill.fillAmount = nitroSystem.GetChargeNormalized();
+        if (nitroSystem != null && nitroReadyIndicator != null) nitroReadyIndicator.SetActive(nitroSystem.IsFull() && !nitroSystem.IsBoosting());
 
         if (speedText != null)
         {
@@ -150,77 +170,40 @@ public class UIManager : MonoBehaviour
         }
     }
 
-    // --- ЛОГИКА НАСТРОЕК ---
-    private void OpenSettings()
+    // --- ЛОГИКА СЮЖЕТА ---
+    private void PlayStoryMode()
     {
-        if (settingsMenu != null) settingsMenu.SetActive(true);
+        // Если игрок запускает впервые (нет ключа), грузим Туториал.
+        string nextScene = PlayerPrefs.GetString("NextLevelToPlay", "Tutorial");
+        Debug.Log("Кнопка 'Играть' загружает: " + nextScene);
+        SceneManager.LoadScene(nextScene);
     }
 
-    private void CloseSettings()
-    {
-        if (settingsMenu != null) settingsMenu.SetActive(false);
-    }
-
-    private void SaveSettings()
-    {
-        if (musicSlider != null) PlayerPrefs.SetFloat("VolumeMusic", musicSlider.value);
-        if (sfxSlider != null) PlayerPrefs.SetFloat("VolumeSFX", sfxSlider.value);
-        if (sensitivitySlider != null) PlayerPrefs.SetFloat("SteerSensitivity", sensitivitySlider.value);
-        if (qualityDropdown != null) PlayerPrefs.SetInt("GraphicsQuality", qualityDropdown.value);
-        PlayerPrefs.Save();
-        ApplySettings();
-        Debug.Log("Настройки сохранены!");
-    }
-
-    private void LoadSettings()
-    {
-        float musicVol = PlayerPrefs.GetFloat("VolumeMusic", 0.8f);
-        float sfxVol = PlayerPrefs.GetFloat("VolumeSFX", 0.8f);
-        float sensitivity = PlayerPrefs.GetFloat("SteerSensitivity", 1.0f);
-        int quality = PlayerPrefs.GetInt("GraphicsQuality", 1);
-
-        if (musicSlider != null) musicSlider.value = musicVol;
-        if (sfxSlider != null) sfxSlider.value = sfxVol;
-        if (sensitivitySlider != null) sensitivitySlider.value = sensitivity;
-        if (qualityDropdown != null) qualityDropdown.value = quality;
-
-        ApplySettings();
-    }
-
-    private void ApplySettings()
-    {
-        if (musicSlider != null) AudioListener.volume = musicSlider.value;
-        if (sensitivitySlider != null && steeringWheel != null) 
-            steeringWheel.tiltSensitivity = sensitivitySlider.value;
-        if (qualityDropdown != null) QualitySettings.SetQualityLevel(qualityDropdown.value);
-    }
-
-    // --- ЛОГИКА УРОВНЕЙ ---
-    private void OpenLevelMenu()
-    {
-        if (levelSelectMenu != null) levelSelectMenu.SetActive(true);
-    }
-
-    private void SelectLevel(int levelNumber)
-    {
-        selectedLevelIndex = levelNumber;
-        PlayerPrefs.SetInt("SelectedLevel", levelNumber);
-    }
-
-    private void PlaySelectedLevel()
+    private void LoadLevelDirectly(string levelName)
     {
         Time.timeScale = 1f;
-        SceneManager.LoadScene(selectedLevelIndex);
+        SceneManager.LoadScene(levelName);
+    }
+
+    // Вызывается после победы на уровне
+    public void LevelCompleted(string nextLevelName)
+    {
+        PlayerPrefs.SetString("NextLevelToPlay", nextLevelName);
+        PlayerPrefs.Save();
+        Debug.Log("Прогресс сохранен! Следующий уровень по сюжету: " + nextLevelName);
     }
 
     // --- ОСТАЛЬНОЕ ---
-    public void ShowNitroActive(bool active) { if (nitroActiveIndicator != null) nitroActiveIndicator.SetActive(active); }
-
-    private void ToggleControlMode()
+    public void GoToMainMenu()
     {
-        if (car != null) { car.useWheel = !car.useWheel; ApplyControlMode(); }
+        Time.timeScale = 1f;
+        SceneManager.LoadScene("MainMenu");
     }
 
+    private void RestartLevel() { Time.timeScale = 1f; SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); }
+    private void QuitGame() { Application.Quit(); }
+
+    private void ToggleControlMode() { if (car != null) { car.useWheel = !car.useWheel; ApplyControlMode(); } }
     private void ApplyControlMode()
     {
         if (car == null) return;
@@ -237,6 +220,35 @@ public class UIManager : MonoBehaviour
         else { pauseMenu.SetActive(false); Time.timeScale = 1f; }
     }
 
-    private void RestartLevel() { Time.timeScale = 1f; SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); }
-    private void QuitGame() { Time.timeScale = 1f; Application.Quit(); }
+    public void ShowNitroActive(bool active) { if (nitroActiveIndicator != null) nitroActiveIndicator.SetActive(active); }
+
+    private void OpenSettings() { if (settingsMenu != null) settingsMenu.SetActive(true); }
+    private void CloseSettings() { if (settingsMenu != null) settingsMenu.SetActive(false); }
+    private void SaveSettings()
+    {
+        if (musicSlider != null) PlayerPrefs.SetFloat("VolumeMusic", musicSlider.value);
+        if (sfxSlider != null) PlayerPrefs.SetFloat("VolumeSFX", sfxSlider.value);
+        if (sensitivitySlider != null) PlayerPrefs.SetFloat("SteerSensitivity", sensitivitySlider.value);
+        if (qualityDropdown != null) PlayerPrefs.SetInt("GraphicsQuality", qualityDropdown.value);
+        PlayerPrefs.Save(); ApplySettings();
+    }
+    private void LoadSettings()
+    {
+        float musicVol = PlayerPrefs.GetFloat("VolumeMusic", 0.8f);
+        float sfxVol = PlayerPrefs.GetFloat("VolumeSFX", 0.8f);
+        float sensitivity = PlayerPrefs.GetFloat("SteerSensitivity", 1.0f);
+        int quality = PlayerPrefs.GetInt("GraphicsQuality", 1);
+
+        if (musicSlider != null) musicSlider.value = musicVol;
+        if (sfxSlider != null) sfxSlider.value = sfxVol;
+        if (sensitivitySlider != null) sensitivitySlider.value = sensitivity;
+        if (qualityDropdown != null) qualityDropdown.value = quality;
+        ApplySettings();
+    }
+    private void ApplySettings()
+    {
+        if (musicSlider != null) AudioListener.volume = musicSlider.value;
+        if (sensitivitySlider != null && steeringWheel != null) steeringWheel.tiltSensitivity = sensitivitySlider.value;
+        if (qualityDropdown != null) QualitySettings.SetQualityLevel(qualityDropdown.value);
+    }
 }

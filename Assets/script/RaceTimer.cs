@@ -48,4 +48,8 @@ public class RaceTimer : MonoBehaviour
     }
 
     public void StopTimer() => isRunning = false;
+        public float GetTimeRemaining()
+    {
+        return timeRemaining;
+    }
 }
