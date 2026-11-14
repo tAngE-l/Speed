@@ -54,11 +54,20 @@ public class UIManager : MonoBehaviour
     public Button btnLevel2;           
     public Button btnLevel3;           
     
+    [Header("ЗВЕЗДЫ В МЕНЮ ВЫБОРА")]
+    public Image[] level1Stars; 
+    public Image[] level2Stars; 
+    public Image[] level3Stars; 
+    
     [Header("ГЛАВНОЕ МЕНЮ")]
     public GameObject mainMenuPanel; 
-    public Button btnPlayGame;       // Кнопка "Играть" (по сюжету)
-    public Button btnOpenLevels;     // Кнопка "Выбор уровней"
+    public Button btnPlayGame;       
+    public Button btnOpenLevels;     
     public Button btnMainQuit;       
+    public Button btnOpenGarage;     
+
+    [Header("ГАРАЖ")]
+    public Button btnGarageBack;     
 
     private NitroSystem nitroSystem;
     private CarController car;
@@ -92,10 +101,9 @@ public class UIManager : MonoBehaviour
             if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
 
             if (btnPlayGame != null) btnPlayGame.onClick.AddListener(PlayStoryMode);
-            if (btnOpenLevels != null) btnOpenLevels.onClick.AddListener(() => { if (levelSelectMenu != null) levelSelectMenu.SetActive(true); });
+            if (btnOpenLevels != null) btnOpenLevels.onClick.AddListener(OpenLevelMenu);
             if (btnCloseLevels != null) btnCloseLevels.onClick.AddListener(() => { if (levelSelectMenu != null) levelSelectMenu.SetActive(false); });
             
-            // Кнопки выбора уровней (переигровка)
             if (btnLevel1 != null) btnLevel1.onClick.AddListener(() => LoadLevelDirectly("Level_1"));
             if (btnLevel2 != null) btnLevel2.onClick.AddListener(() => LoadLevelDirectly("Level_2"));
             if (btnLevel3 != null) btnLevel3.onClick.AddListener(() => LoadLevelDirectly("Level_3"));
@@ -104,9 +112,20 @@ public class UIManager : MonoBehaviour
             if (btnCloseSettings != null) btnCloseSettings.onClick.AddListener(CloseSettings);
             if (btnSaveSettings != null) btnSaveSettings.onClick.AddListener(SaveSettings);
             if (btnMainQuit != null) btnMainQuit.onClick.AddListener(QuitGame);
-            
+            if (btnOpenGarage != null) btnOpenGarage.onClick.AddListener(GoToGarage);
+
             LoadSettings();
-            return; // Для главного меню настройка завершена
+            return; 
+        }
+
+        // ==========================================
+        // НАСТРОЙКА ДЛЯ ГАРАЖА
+        // ==========================================
+        if (currentScene == "Garage")
+        {
+            if (btnGarageBack != null) btnGarageBack.onClick.AddListener(GoToMainMenu);
+            LoadSettings();
+            return;
         }
 
         // ==========================================
@@ -131,10 +150,8 @@ public class UIManager : MonoBehaviour
         if (pauseButton != null) pauseButton.onClick.AddListener(TogglePause);
         if (btnResume != null) btnResume.onClick.AddListener(TogglePause);
         if (btnRestart != null) btnRestart.onClick.AddListener(RestartLevel);
-        
-        // Кнопка "Выход" в меню паузы ведет в главное меню
         if (btnQuit != null) btnQuit.onClick.AddListener(GoToMainMenu);
-        
+        if (btnOpenGarage != null) btnOpenGarage.onClick.AddListener(GoToGarageFromPause);
         if (btnToggleControl != null) btnToggleControl.onClick.AddListener(ToggleControlMode);
         
         if (settingsMenu != null) settingsMenu.SetActive(false);
@@ -170,12 +187,45 @@ public class UIManager : MonoBehaviour
         }
     }
 
+    // --- МЕНЮ ВЫБОРА И ЗВЕЗДЫ ---
+    private void OpenLevelMenu() 
+    { 
+        if (levelSelectMenu != null) levelSelectMenu.SetActive(true);
+        UpdateLevelStars(); // Обновляем звезды при открытии
+    }
+
+    private void UpdateLevelStars()
+    {
+        // Читаем сохранения из памяти
+        int stars1 = PlayerPrefs.GetInt("Stars_Level_1", 0);
+        int stars2 = PlayerPrefs.GetInt("Stars_Level_2", 0);
+        int stars3 = PlayerPrefs.GetInt("Stars_Level_3", 0);
+
+        SetStarsColor(level1Stars, stars1);
+        SetStarsColor(level2Stars, stars2);
+        SetStarsColor(level3Stars, stars3);
+    }
+
+    private void SetStarsColor(Image[] starsArray, int earnedStars)
+    {
+        if (starsArray == null) return;
+
+        for (int i = 0; i < starsArray.Length; i++)
+        {
+            if (starsArray[i] != null)
+            {
+                if (i < earnedStars) 
+                    starsArray[i].color = Color.yellow;
+                else 
+                    starsArray[i].color = new Color(0.3f, 0.3f, 0.3f, 0.5f);
+            }
+        }
+    }
+
     // --- ЛОГИКА СЮЖЕТА ---
     private void PlayStoryMode()
     {
-        // Если игрок запускает впервые (нет ключа), грузим Туториал.
         string nextScene = PlayerPrefs.GetString("NextLevelToPlay", "Tutorial");
-        Debug.Log("Кнопка 'Играть' загружает: " + nextScene);
         SceneManager.LoadScene(nextScene);
     }
 
@@ -185,21 +235,18 @@ public class UIManager : MonoBehaviour
         SceneManager.LoadScene(levelName);
     }
 
-    // Вызывается после победы на уровне
     public void LevelCompleted(string nextLevelName)
     {
         PlayerPrefs.SetString("NextLevelToPlay", nextLevelName);
         PlayerPrefs.Save();
-        Debug.Log("Прогресс сохранен! Следующий уровень по сюжету: " + nextLevelName);
     }
+
+    // --- ГАРАЖ И ПЕРЕХОДЫ ---
+    private void GoToGarage() { SceneManager.LoadScene("Garage"); }
+    private void GoToGarageFromPause() { Time.timeScale = 1f; SceneManager.LoadScene("Garage"); }
+    public void GoToMainMenu() { Time.timeScale = 1f; SceneManager.LoadScene("MainMenu"); }
 
     // --- ОСТАЛЬНОЕ ---
-    public void GoToMainMenu()
-    {
-        Time.timeScale = 1f;
-        SceneManager.LoadScene("MainMenu");
-    }
-
     private void RestartLevel() { Time.timeScale = 1f; SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); }
     private void QuitGame() { Application.Quit(); }
 
